@@ -27,10 +27,12 @@ public class Controller implements Initializable {
                     new MapView.Bounds(0.5, 0.5)
             );
             map.setFillPattern(new MapView.ColoredPattern(new Color(255, 0, 0)));
-            map.fillRect(
-                    new MapView.Coords(0.5, 0.5),
-                    new MapView.Bounds(0.5, 0.5)
-            );
+            map.beginPath();
+            map.moveTo(new MapView.Coords(0.5, 0.5));
+            map.lineTo(new MapView.Coords(1, 0.75));
+            map.lineTo(new MapView.Coords(0.75, 1));
+            map.closePath();
+            map.fillPath();
         });
     }
 }

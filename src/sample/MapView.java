@@ -8,12 +8,8 @@ import javafx.scene.web.WebEngine;
 import javafx.scene.web.WebView;
 
 import java.awt.*;
-import java.lang.reflect.Field;
 import java.util.*;
 import java.util.List;
-import java.util.function.Function;
-import java.util.stream.Stream;
-import java.util.stream.StreamSupport;
 
 public class MapView extends Region {
     private WebView webView;
@@ -34,7 +30,7 @@ public class MapView extends Region {
         checkLoaded();
         this.strokePattern = strokePattern;
         getWebEngine().executeScript(
-                String.format(
+                String.format(Locale.US, 
                         "%s = %s",
                         "window.MapOverlay.CanvasOverlay.getContext().strokeStyle",
                         strokePattern.toJS()
@@ -50,7 +46,7 @@ public class MapView extends Region {
         checkLoaded();
         this.fillPattern = fillPattern;
         getWebEngine().executeScript(
-                String.format(
+                String.format(Locale.US, 
                         "%s = %s",
                         "window.MapOverlay.CanvasOverlay.getContext().fillStyle",
                         fillPattern.toJS()
@@ -85,7 +81,7 @@ public class MapView extends Region {
     }
 
     private static String colorToHex(Color color) {
-        return String.format("#%02X%02X%02X", color.getRed(), color.getGreen(), color.getBlue());
+        return String.format(Locale.US, "#%02X%02X%02X", color.getRed(), color.getGreen(), color.getBlue());
     }
 
     public void onload(Runnable callback) {
@@ -102,8 +98,10 @@ public class MapView extends Region {
 
         webView = new WebView();
         getWebEngine().setOnAlert(event -> showAlert(event.getData()));
-        getWebEngine().load(getClass().getResource("/sample/mapviewlayout.html").toString());
-        getWebEngine().executeScript(String.format(
+        getWebEngine().load(getClass().getResource(
+                "/sample/mapviewlayout.html" // TODO change resource name!
+        ).toString());
+        getWebEngine().executeScript(String.format(Locale.US, 
                 "window.COORDS = {\n" +
                         "            center: {\n" +
                         "                lat: %f, lng: %f\n" +
@@ -193,11 +191,11 @@ public class MapView extends Region {
             if (i != params.length - 1) format.append(",");
         }
         format.append(")");
-        return String.format(format.toString(), params);
+        return String.format(Locale.US, format.toString(), params);
     }
 
     private static String buildAssignment(String lvalue, Object value) {
-        return String.format(
+        return String.format(Locale.US, 
                 "%s = " + (value != null ? patternFromClass(value.getClass()) : "%s"),
                 lvalue,
                 value
@@ -209,6 +207,8 @@ public class MapView extends Region {
             return "\"%s\"";
         } else if (Number.class.isAssignableFrom(clazz)) {
             return "%f";
+        } else if (clazz == Boolean.class) {
+            return "%b";
         } else throw new RuntimeException("Invalid argument class: " + clazz);
     }
 
@@ -250,13 +250,137 @@ public class MapView extends Region {
         update();
     }
 
+    public void strokeTextPixel(CharSequence text, Coords coords, long maxWidth) {
+        checkLoaded();
+        Object[] args = maxWidth < 0 ? new Object[] {text.toString(), coords.x, coords.y} : new Object[] {text.toString(), coords.x, coords.y, maxWidth};
+        getWebEngine().executeScript(buildFunctionCall(
+                "window.MapOverlay.CanvasOverlay.getContext().strokeText", args
+        ));
+    }
+
+    public void strokeTextPixel(CharSequence text, Coords coords) {
+        strokeTextPixel(text, coords, -1);
+    }
+
+    public void strokeText(CharSequence text, Coords coords, double maxWidth) {
+        strokeTextPixel(text, unitCoordsToPixels(coords), horizontalUnitsToPixels(maxWidth));
+    }
+
+    public void strokeText(CharSequence text, Coords coords) {
+        strokeTextPixel(text, unitCoordsToPixels(coords), -1);
+    }
+
     public void fillTextPixel(CharSequence text, Coords coords, long maxWidth) {
-        
+        checkLoaded();
+        Object[] args = maxWidth < 0 ? new Object[] {text.toString(), coords.x, coords.y} : new Object[] {text.toString(), coords.x, coords.y, maxWidth};
+        getWebEngine().executeScript(buildFunctionCall(
+                "window.MapOverlay.CanvasOverlay.getContext().fillText", args
+        ));
+    }
+
+    public void fillTextPixel(CharSequence text, Coords coords) {
+        fillTextPixel(text, coords, -1);
+    }
+
+    public void fillText(CharSequence text, Coords coords, double maxWidth) {
+        fillTextPixel(text, unitCoordsToPixels(coords), horizontalUnitsToPixels(maxWidth));
+    }
+
+    public void fillText(CharSequence text, Coords coords) {
+        fillTextPixel(text, unitCoordsToPixels(coords), -1);
     }
 
     public void strokeRect(Coords coords, Bounds bounds) {
         strokeRectPixel(unitCoordsToPixels(coords), unitBoundsToPixels(bounds));
     }
+
+    public void beginPath() {
+        checkLoaded();
+        getWebEngine().executeScript(buildFunctionCall(
+                "window.MapOverlay.CanvasOverlay.getContext().beginPath"
+        ));
+    }
+
+    public void closePath() {
+        checkLoaded();
+        getWebEngine().executeScript(buildFunctionCall(
+                "window.MapOverlay.CanvasOverlay.getContext().closePath"
+        ));
+    }
+
+    public void fillPath() {
+        checkLoaded();
+        getWebEngine().executeScript(buildFunctionCall(
+                "window.MapOverlay.CanvasOverlay.getContext().fill"
+        ));
+        update();
+    }
+
+    public void strokePath() {
+        checkLoaded();
+        getWebEngine().executeScript(buildFunctionCall(
+                "window.MapOverlay.CanvasOverlay.getContext().stroke"
+        ));
+        update();
+    }
+
+    public void moveToPixel(Coords coords) {
+        checkLoaded();
+        getWebEngine().executeScript(buildFunctionCall(
+                "window.MapOverlay.CanvasOverlay.getContext().moveTo",
+                coords.getX(), coords.getY()
+        ));
+    }
+
+    public void lineToPixel(Coords coords) {
+        checkLoaded();
+        getWebEngine().executeScript(buildFunctionCall(
+                "window.MapOverlay.CanvasOverlay.getContext().lineTo",
+                coords.getX(), coords.getY()
+        ));
+    }
+
+    public void moveTo(Coords coords) {
+        moveToPixel(unitCoordsToPixels(coords));
+    }
+
+    public void lineTo(Coords coords) {
+        lineToPixel(unitCoordsToPixels(coords));
+    }
+
+    public void arcPathPixel(Coords coords, long r, double startAngle, double endAngle, boolean counterClockwise) {
+        checkLoaded();
+        getWebEngine().executeScript(buildFunctionCall(
+                "window.MapOverlay.CanvasOverlay.getContext().arc",
+                coords.x, coords.y,
+                r,
+                startAngle, endAngle,
+                counterClockwise
+        ));
+    }
+
+    public void arcPathPixel(Coords coords, long r, double startAngle, double endAngle) {
+        arcPathPixel(coords, r, startAngle, endAngle, false);
+    }
+
+    public void arcPath(Coords coords, double r, double startAngle, double endAngle, boolean counterClockwise, boolean heightRelated) {
+        arcPathPixel(
+                unitCoordsToPixels(coords),
+                heightRelated ? verticalUnitsToPixels(r) : horizontalUnitsToPixels(r),
+                startAngle, endAngle,
+                counterClockwise
+        );
+    }
+
+    public void arcPath(Coords coords, double r, double startAngle, double endAngle, boolean heightRelated) {
+        arcPathPixel(
+                unitCoordsToPixels(coords),
+                heightRelated ? verticalUnitsToPixels(r) : horizontalUnitsToPixels(r),
+                startAngle, endAngle,
+                false
+        );
+    }
+
 
     public WebEngine getWebEngine() {
         checkInit();
